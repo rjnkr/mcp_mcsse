@@ -1,0 +1,14 @@
+services:
+  mcp-mcsse:
+    build: .
+    env_file: .env
+    ports:
+      - "3000:3000"
+    environment:
+      TOKEN_FILE: /tokens/auth.json
+      PORT: "3000"
+    volumes:
+      - aoi-tokens:/tokens
+
+volumes:
+  api-tokens:
