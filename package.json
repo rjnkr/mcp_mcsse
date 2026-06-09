@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && cp src/success.html build/success.html",
     "start": "node build/index.js",
     "login": "node build/login.js"
   },

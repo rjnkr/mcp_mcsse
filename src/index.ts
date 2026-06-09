@@ -14,7 +14,7 @@ import { registerVoyageTools } from "./voyage.js";
 import { registerAisMailTools } from "./aismail.js";
 
 const server = new McpServer({
-  name: "vessel-info-server",
+  name: "mcp_mcsse",
   version: "1.0.0",
 });
 
