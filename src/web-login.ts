@@ -8,7 +8,7 @@
 import "dotenv/config";
 import express from "express";
 import { createHash, randomBytes } from "crypto";
-import { readFileSync, writeFileSync } from "fs";
+import { readFileSync, writeFileSync, existsSync, unlinkSync } from "fs";
 import { homedir } from "os";
 import { join } from "path";
 import { fileURLToPath } from "url";
@@ -35,6 +35,12 @@ const pending = new Map<string, string>();
 export const app = express();
 
 app.get("/login", (_req, res) => {
+  pending.clear();
+  if (existsSync(TOKEN_FILE)) {
+    unlinkSync(TOKEN_FILE);
+    console.error("Login: cleared existing token file", TOKEN_FILE);
+  }
+
   const verifier = base64url(randomBytes(32));
   const challenge = base64url(createHash("sha256").update(verifier).digest());
   const state = base64url(randomBytes(16));
