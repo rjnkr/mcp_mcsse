@@ -8,7 +8,7 @@ services:
       TOKEN_FILE: /tokens/auth.json
       PORT: "3000"
     volumes:
-      - aoi-tokens:/tokens
+      - api-tokens:/tokens
 
 volumes:
   api-tokens:

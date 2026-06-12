@@ -1,4 +1,5 @@
 import "dotenv/config";
+import { randomUUID } from "crypto";
 import express from "express";
 import { app, PORT } from "./web-login.js";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -14,19 +15,36 @@ import { registerVoyageTools } from "./voyage.js";
 import { registerAisMailTools } from "./aismail.js";
 import { registerVesselHistoryTools } from "./vessel-history.js";
 
-const server = new McpServer({
-  name: "mcp_mcsse",
-  version: "1.0.0",
-});
+// ── Session registry ──────────────────────────────────────────────────────────
 
-registerVesselInfoTools(server);
-registerTrackTools(server);
-registerAlertTools(server);
-registerGeoTools(server);
-registerTopologyTools(server);
-registerVoyageTools(server);
-registerAisMailTools(server);
-registerVesselHistoryTools(server);
+const sessions = new Map<string, StreamableHTTPServerTransport>();
+
+function createSession(): { server: McpServer; transport: StreamableHTTPServerTransport } {
+  const sessionServer = new McpServer({ name: "mcp_mcsse", version: "1.0.0" });
+  registerVesselInfoTools(sessionServer);
+  registerTrackTools(sessionServer);
+  registerAlertTools(sessionServer);
+  registerGeoTools(sessionServer);
+  registerTopologyTools(sessionServer);
+  registerVoyageTools(sessionServer);
+  registerAisMailTools(sessionServer);
+  registerVesselHistoryTools(sessionServer);
+
+  const transport = new StreamableHTTPServerTransport({
+    sessionIdGenerator: () => randomUUID(),
+  });
+
+  transport.onclose = () => {
+    if (transport.sessionId) {
+      sessions.delete(transport.sessionId);
+      console.error(`[MCP] Session ${transport.sessionId} closed, active: ${sessions.size}`);
+    }
+  };
+
+  return { server: sessionServer, transport };
+}
+
+// ── Token refresh cron ────────────────────────────────────────────────────────
 
 const tokenRefreshCron = process.env.TOKEN_REFRESH_CRON ?? "*/5 * * * *";
 cron.schedule(tokenRefreshCron, async () => {
@@ -37,13 +55,33 @@ cron.schedule(tokenRefreshCron, async () => {
   }
 });
 
-const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
-await server.connect(transport);
+// ── MCP endpoint ──────────────────────────────────────────────────────────────
 
 app.use(express.json());
 app.all("/mcp", async (req, res) => {
   try {
+    const sessionId = req.headers["mcp-session-id"] as string | undefined;
+
+    if (sessionId) {
+      const transport = sessions.get(sessionId);
+      if (!transport) {
+        console.error(`[MCP] Unknown session ${sessionId} — client must reinitialize`);
+        res.status(404).json({ error: "Session not found. Please reinitialize." });
+        return;
+      }
+      await transport.handleRequest(req, res, req.body);
+      return;
+    }
+
+    // No session ID — new client connecting
+    const { server: sessionServer, transport } = createSession();
+    await sessionServer.connect(transport);
     await transport.handleRequest(req, res, req.body);
+
+    if (transport.sessionId) {
+      sessions.set(transport.sessionId, transport);
+      console.error(`[MCP] Session ${transport.sessionId} created, active: ${sessions.size}`);
+    }
   } catch (err) {
     console.error("[MCP] Unhandled error in /mcp handler:", err);
     if (!res.headersSent) {
@@ -52,7 +90,8 @@ app.all("/mcp", async (req, res) => {
   }
 });
 
-// Express error middleware — catches synchronous throws and next(err) calls
+// ── Express error middleware ──────────────────────────────────────────────────
+
 app.use((err: unknown, req: express.Request, res: express.Response, _next: express.NextFunction) => {
   console.error(`[Express] Unhandled error on ${req.method} ${req.path}:`, err);
   if (!res.headersSent) {
@@ -67,6 +106,8 @@ process.on("uncaughtException", (err) => {
 process.on("unhandledRejection", (reason) => {
   console.error("[Process] Unhandled promise rejection:", reason);
 });
+
+// ── Start ─────────────────────────────────────────────────────────────────────
 
 app.listen(PORT, () => {
   console.error(`Server listening on port ${PORT}`);
