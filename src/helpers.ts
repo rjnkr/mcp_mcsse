@@ -1,5 +1,17 @@
 import { getAccessToken } from "./auth.js";
 
+// ── Auth error ────────────────────────────────────────────────────────────────
+
+const PORT = process.env.PORT ?? "3000";
+
+function handleAuthError(status: number, path: string, body: string): never {
+  console.error(`[Auth] ${status} on ${path} — session invalid or expired. Visit http://localhost:${PORT}/login to re-authenticate.`);
+  throw new Error(
+    `Not authenticated (${status}): your session with the MCSSE backend is invalid or has expired. ` +
+    `Please log in again at http://localhost:${PORT}/login.`,
+  );
+}
+
 // ── MCP response helpers ──────────────────────────────────────────────────────
 
 export function toText(data: unknown): string {
@@ -45,6 +57,7 @@ export async function apiGet(path: string): Promise<unknown> {
   if (res.status === 204) return null;
   if (!res.ok) {
     const text = await res.text();
+    if (res.status === 401 || res.status === 403) handleAuthError(res.status, path, text);
     const msg = `API error ${res.status}: ${text}`;
     console.error(`[GET ${path}] ${msg}`);
     throw new Error(msg);
@@ -59,6 +72,7 @@ export async function apiPost(path: string, body: unknown): Promise<unknown> {
     return text ? JSON.parse(text) : null;
   }
   const text = await res.text();
+  if (res.status === 401 || res.status === 403) handleAuthError(res.status, path, text);
   const msg = `API error ${res.status}: ${text}`;
   console.error(`[POST ${path}] ${msg}`);
   throw new Error(msg);
@@ -71,6 +85,7 @@ export async function apiPut(path: string, body: unknown): Promise<unknown> {
     return text ? JSON.parse(text) : null;
   }
   const text = await res.text();
+  if (res.status === 401 || res.status === 403) handleAuthError(res.status, path, text);
   const msg = `API error ${res.status}: ${text}`;
   console.error(`[PUT ${path}] ${msg}`);
   throw new Error(msg);
@@ -86,6 +101,7 @@ export async function apiPatch(path: string, body?: unknown): Promise<unknown> {
     return text ? JSON.parse(text) : null;
   }
   const text = await res.text();
+  if (res.status === 401 || res.status === 403) handleAuthError(res.status, path, text);
   const msg = `API error ${res.status}: ${text}`;
   console.error(`[PATCH ${path}] ${msg}`);
   throw new Error(msg);
@@ -95,6 +111,7 @@ export async function apiDelete(path: string): Promise<void> {
   const res = await apiFetch(path, { method: "DELETE" });
   if (!res.ok) {
     const text = await res.text();
+    if (res.status === 401 || res.status === 403) handleAuthError(res.status, path, text);
     const msg = `API error ${res.status}: ${text}`;
     console.error(`[DELETE ${path}] ${msg}`);
     throw new Error(msg);
