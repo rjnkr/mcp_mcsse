@@ -3,7 +3,7 @@
  * Auto-refreshes using the refresh_token when the access_token is near expiry.
  */
 
-import { readFileSync, writeFileSync } from "fs";
+import { readFile, writeFile } from "fs/promises";
 import { homedir } from "os";
 import { join } from "path";
 
@@ -19,9 +19,9 @@ interface TokenStore {
   expires_at: number;
 }
 
-function loadTokens(): TokenStore {
+async function loadTokens(): Promise<TokenStore> {
   try {
-    const raw = readFileSync(TOKEN_FILE, "utf8");
+    const raw = await readFile(TOKEN_FILE, "utf8");
     return JSON.parse(raw) as TokenStore;
   } catch {
     throw new Error(
@@ -30,8 +30,8 @@ function loadTokens(): TokenStore {
   }
 }
 
-function saveTokens(store: TokenStore): void {
-  writeFileSync(TOKEN_FILE, JSON.stringify(store, null, 2), { mode: 0o600 });
+async function saveTokens(store: TokenStore): Promise<void> {
+  await writeFile(TOKEN_FILE, JSON.stringify(store, null, 2), { mode: 0o600 });
 }
 
 async function refreshAccessToken(refreshToken: string): Promise<TokenStore> {
@@ -73,7 +73,7 @@ async function refreshAccessToken(refreshToken: string): Promise<TokenStore> {
 }
 
 export async function getAccessToken(): Promise<string> {
-  let store = loadTokens();
+  let store = await loadTokens();
 
   if (Date.now() >= store.expires_at) {
     store = await refreshAccessToken(store.refresh_token);
