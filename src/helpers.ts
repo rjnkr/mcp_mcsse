@@ -1,4 +1,7 @@
+import { Agent } from "undici";
 import { getAccessToken } from "./auth.js";
+
+const keepAliveAgent = new Agent({ connections: 10, keepAliveTimeout: 30_000 });
 
 // ── Auth error ────────────────────────────────────────────────────────────────
 
@@ -44,6 +47,8 @@ export async function apiFetch(path: string, options: RequestInit = {}): Promise
   const token = await getAccessToken();
   return fetch(`${MCSSE_API_URL}${path}`, {
     ...options,
+    // @ts-expect-error undici dispatcher is not in the standard RequestInit type
+    dispatcher: keepAliveAgent,
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,

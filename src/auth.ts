@@ -19,10 +19,14 @@ interface TokenStore {
   expires_at: number;
 }
 
+let tokenCache: TokenStore | null = null;
+
 async function loadTokens(): Promise<TokenStore> {
+  if (tokenCache) return tokenCache;
   try {
     const raw = await readFile(TOKEN_FILE, "utf8");
-    return JSON.parse(raw) as TokenStore;
+    tokenCache = JSON.parse(raw) as TokenStore;
+    return tokenCache;
   } catch {
     throw new Error(
       `Not authenticated. Run "npm run login" in the MCP server directory first:\n  cd /Users/richard/Documents/MCP_mcsse && npm run login`,
@@ -31,6 +35,7 @@ async function loadTokens(): Promise<TokenStore> {
 }
 
 async function saveTokens(store: TokenStore): Promise<void> {
+  tokenCache = store;
   await writeFile(TOKEN_FILE, JSON.stringify(store, null, 2), { mode: 0o600 });
 }
 

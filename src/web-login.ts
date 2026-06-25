@@ -57,6 +57,7 @@ app.get("/login", (_req, res) => {
     state,
   });
 
+  console.log(params);
   res.redirect(`${AUTH_URL}/auth?${params}`);
 });
 
